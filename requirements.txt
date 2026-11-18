@@ -1,0 +1,18 @@
+# Install matching torch/torchvision builds for your CPU/CUDA first.
+# Verified: Python 3.11, torch 2.3.1, torchvision 0.18.1.
+torch>=2.3,<2.6
+torchvision>=0.18,<0.21
+numpy<2
+Pillow
+yacs
+PyYAML
+tqdm
+ftfy
+regex
+scipy
+scikit-learn
+gdown
+tabulate
+tensorboard
+future
+six

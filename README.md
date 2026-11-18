@@ -1,15 +1,53 @@
 # HiCroPL-Independent-RS
 
-面向遥感图像分类的独立双分支深层提示学习基线。从 `applenet_baseline` 分离，仅运行 **HiCroPL_NoFusion**。项目名用于标识研究工程，不代表新提出的方法或完整 HiCroPL。
+**HiCroPL-Independent-RS** 是基于 HiCroPL 改编的遥感场景分类基线。它移除了HiCroPL方法的双向提示映射与代理池化，保留独立的视觉和文本深层提示、冻结特征残差及双分支余弦蒸馏。
 
-模型和训练流程保持原项目行为：移除双向提示映射及代理池化，保留视觉/文本独立深层提示、冻结特征残差和双分支余弦蒸馏。本次分离不调整训练超参数，也不宣称提高精度。原项目保留，不额外创建完整备份。
+项目覆盖 PatternNet、RSICD、RESISC45、MLRSNet 及其各自的 v2 版本，共八个数据集，支持 Base-to-New、Cross-Datasets 和单源多目标域泛化（SSMT）三类实验。
+
+## 实验结果
+
+实测使用 CLIP ViT-B/16，在 16-shot 设置下训练 50 轮，教师文本为每类 20 条遥感描述。结果按 seed 1、2、3 汇总，表中单位为百分比。下表以 [FICA 论文](https://doi.org/10.1016/j.isprsjprs.2026.07.023)表 1–3 的公开结果为参考。
+
+| 实验 | 指标 | HiCroPL-Independent-RS（实测） | FICA（论文） | 差值（百分点） |
+|---|---|---:|---:|---:|
+| Base-to-New | 四个数据集的平均 H | 85.11 | 86.02 | −0.91 |
+| Cross-Datasets | 三个目标数据集的平均准确率 | 67.03 | 72.48 | −5.45 |
+| SSMT | 三个目标数据集的平均准确率 | 87.29 | 92.26 | −4.97 |
+
+Base-to-New 的平均 H 与 FICA 相差 0.91 个百分点。PatternNet 上的 H 和 PatternNet → RSICD 的迁移准确率也高于 FICA 的公开数值，说明该方法在部分遥感泛化任务上具有竞争力。FICA 在两项迁移实验中的目标域平均准确率更高。
+
+### Base-to-New
+
+H 是 Base 与 New 准确率的调和平均，先逐 seed 计算，再汇总为均值 ± 样本标准差。总体 H 对四个数据集等权平均。
+
+| 数据集 | Base（实测） | New（实测） | H（实测） | H（FICA 论文） |
+|---|---:|---:|---:|---:|
+| PatternNet | 96.75 ± 0.10 | 89.27 ± 0.18 | 92.86 ± 0.07 | 84.76 |
+| RSICD | 96.20 ± 0.27 | 76.15 ± 0.66 | 85.01 ± 0.49 | 86.81 |
+| RESISC45 | 94.05 ± 0.61 | 78.75 ± 0.51 | 85.72 ± 0.47 | 88.45 |
+| MLRSNet | 90.56 ± 0.86 | 66.77 ± 0.96 | 76.86 ± 0.81 | 83.91 |
+
+### Cross-Datasets 与 SSMT
+
+准确率以三个 seed 的均值 ± 样本标准差表示。两项实验各自对三个目标域等权平均。
+
+| 实验 | 源 → 目标 | 准确率（实测） | 准确率（FICA 论文） |
+|---|---|---:|---:|
+| Cross-Datasets | PatternNet → RSICD | 70.30 ± 0.80 | 65.42 |
+| Cross-Datasets | PatternNet → RESISC45 | 69.80 ± 0.76 | 73.10 |
+| Cross-Datasets | PatternNet → MLRSNet | 60.98 ± 0.21 | 78.93 |
+| SSMT | PatternNetv2 → RSICDv2 | 88.20 ± 1.31 | 88.77 |
+| SSMT | PatternNetv2 → RESISC45v2 | 90.95 ± 0.33 | 98.20 |
+| SSMT | PatternNetv2 → MLRSNetv2 | 82.72 ± 0.81 | 89.80 |
+
+FICA 的公开结果沿用论文设置。本项目尚未在统一代码和数据划分下复跑 FICA，因此这些数值用于文献对照。
 
 ## 保留与移除
 
 | 内容 | 处理 |
 |---|---|
 | NoFusion 提示学习器、编码器、损失、优化与加载逻辑 | 保留；仅将 CLIP 加载函数从 CoOp 文件迁入公共文件 |
-| 8 个遥感数据集加载器、划分 JSON | 原样保留 |
+| 8 个遥感数据集加载器、划分 JSON | 保留，划分 JSON 仅调整格式 |
 | 固定模板配置、8 份描述版配置、类别描述 JSON | 原样保留 |
 | Base-to-New、跨数据集、v2 跨域入口 | 保留；默认方法改为 NoFusion |
 | CoOp、PromptSRC 实现、配置与专属测试 | 移除 |
@@ -158,9 +196,9 @@ python -B train.py --root "$DATA_ROOT" --seed 1 --dataset-config-file yaml/datas
 
 `--model-dir` 指向包含 `prompt_learner/` 的目录。内部 checkpoint 参数键未改；完整原版 HiCroPL 的整模型 checkpoint 不属于此兼容范围。续训使用 `train.py --resume /旧训练输出目录` 并带上原来的数据/配置参数。
 
-## 服务器验收
+## 精简后复跑
 
-分离时已在本机验证原/新项目的模型输出、梯度及一次参数更新逐值一致，包括真实 ViT-B/16。一次性验证材料已从训练项目清理。服务器仍需使用相同设置正式复跑，评估准确率及随机波动。
+服务器已完成 18 次训练和 42 次独立评估。与精简前同为 desc20 的运行相比，四个数据集的 Base-to-New 平均 H 变化在 −0.26 至 +0.27 个百分点之间。Cross-Datasets 的 PatternNet → RESISC45 平均准确率由 70.96% 降至 69.80%（−1.15 个百分点），差异原因仍待验证。
 
 ## 代码结构
 
